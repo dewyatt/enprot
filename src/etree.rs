@@ -207,46 +207,44 @@ fn parse_encrypted(
     pstack: &mut Vec<TextNode>,
     text: &mut Vec<TextNode>,
 ) -> Result<(), &'static str> {
-    match cmd.len() {
+    // parse all extended fields, such as pbkdf:
+    let mut extfields: HashMap<String, String> = HashMap::new();
+    for field in cmd.iter().rev() {
+        if field.find(':') == None {
+            // extended fields always come at the end
+            break;
+        }
+        let fields = field.splitn(2, ':').collect::<Vec<&str>>();
+        let key = fields[0];
+        let value = fields[1];
+        if extfields.contains_key(key) {
+            return Err("Duplicate extended field");
+        }
+        extfields.insert(key.to_string(), value.to_string());
+    }
+    let param_count = cmd.len() - extfields.len();
+    let phc: Option<String> = extfields.remove("pbkdf");
+    if !extfields.is_empty() {
+        return Err("Unrecognized extended field(s) present");
+    }
+    match param_count {
         1 => {
             // immediate data
-            // <( DATA HAkDvQFyiTHcE9ghMLGUqIgjP4ybrdzk+xisAQ2ZZJgkgTFB )>
+            // <( ENCRYPTED Agent_007 )>
+            // <( ENCRYPTED Agent_007 pbkdf:... )>
             paops.level += 1;
             pstack.push(TextNode::Encrypted {
                 keyw: cmd[0].to_owned(),
                 txt: text.to_vec(),
-                phc: None,
+                phc,
             });
             text.clear();
             return Ok(());
         }
         2 => {
-            if cmd[1].find(':') == None {
-                // CAS parameter
-                // <( ENCRYPTED Agent_007 7a8da017c0fe671ba16f4bc55b884444e708849290d8366f19c552c90950b8c2 )>
-                let node = vec![TextNode::Stored {
-                    keyw: "ct".to_string(),
-                    cas: cmd[1].to_string(),
-                }];
-                text.push(TextNode::Encrypted {
-                    keyw: cmd[0].to_string(),
-                    txt: node,
-                    phc: None,
-                });
-            } else {
-                // direct data (w/PHC string)
-                // <( ENCRYPTED agent007 pbkdf:$argon2id$v=19$m=65536,t=2,p=4$c29tZXNhbHQ )>
-                pstack.push(TextNode::Encrypted {
-                    keyw: cmd[0].to_owned(),
-                    txt: text.to_vec(),
-                    phc: Some(cmd[1].to_string()),
-                });
-                text.clear();
-            }
-        }
-        3 => {
-            // CAS parameter (w/PHC string)
-            // <( ENCRYPTED agent007 fbd88d5bc0ff5fe1d9f43f50203acaf395026d17fa3e4013ca7fbafab56e9a0b pbkdf:$argon2id$v=19$m=65536,t=2,p=4$c29tZXNhbHQ )>
+            // CAS parameter
+            // <( ENCRYPTED Agent_007 7a8da017c0fe671ba16f4bc55b884444e708849290d8366f19c552c90950b8c2 )>
+            // <( ENCRYPTED Agent_007 7a8da017c0fe671ba16f4bc55b884444e708849290d8366f19c552c90950b8c2 pbkdf:... )>
             let node = vec![TextNode::Stored {
                 keyw: "ct".to_string(),
                 cas: cmd[1].to_string(),
@@ -254,17 +252,14 @@ fn parse_encrypted(
             text.push(TextNode::Encrypted {
                 keyw: cmd[0].to_string(),
                 txt: node,
-                phc: Some(cmd[2].to_string()),
+                phc,
             });
         }
         _ => {
             eprintln!(
                 "Parse: ENCRYPTED has wrong number of \
                  parameters ({}).\n{}:{}:{}",
-                cmd.len(),
-                paops.fname,
-                lineno,
-                line
+                param_count, paops.fname, lineno, line
             );
             return Err("Parse error");
         }

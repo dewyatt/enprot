@@ -22,6 +22,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 extern crate base64;
+extern crate botan;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -32,7 +33,43 @@ use std::path::{Path, PathBuf};
 use cas;
 use prot;
 
-// parse operationsm
+const DEFAULT_PBKDF_SALT_LEN: usize = 16;
+const DEFAULT_PBKDF_ALG: &'static str = "argon2id";
+const DEFAULT_PBKDF_MSEC: u32 = 200;
+
+pub trait RNGRead {
+    fn rng_read(&self, len: usize) -> Result<Vec<u8>, botan::Error>;
+}
+
+impl RNGRead for botan::RandomNumberGenerator {
+    fn rng_read(&self, len: usize) -> Result<Vec<u8>, botan::Error> {
+        self.read(len)
+    }
+}
+
+pub struct PBKDFParams {
+    pub alg: String,    // algorithm name
+    pub saltlen: usize, // salt length
+    pub msec: u32,      // millis count to calc KDF params
+    pub param1: usize,  // param1 (used if msec == 0)
+    pub param2: usize,  // param2 (used if msec == 0),
+    pub param3: usize,  // param3 (used if msec == 0)
+}
+
+impl PBKDFParams {
+    pub fn new() -> PBKDFParams {
+        PBKDFParams {
+            alg: DEFAULT_PBKDF_ALG.to_string(),
+            saltlen: DEFAULT_PBKDF_SALT_LEN,
+            msec: DEFAULT_PBKDF_MSEC,
+            param1: 0,
+            param2: 0,
+            param3: 0,
+        }
+    }
+}
+
+// parse operations
 
 pub struct ParseOps {
     pub left_sep: String,                    // left separator
@@ -45,6 +82,8 @@ pub struct ParseOps {
     pub fname: String,                       // file name being parsed
     pub casdir: PathBuf,                     // directory for cas objects
     pub verbose: bool,                       // verbose output to stdout
+    pub rng: Box<dyn RNGRead>,               // RNG to use
+    pub pbkdf: PBKDFParams,                  // the PBKDF parameters
     level: isize,                            // current recursion level
 }
 
@@ -62,6 +101,8 @@ impl ParseOps {
             casdir: Path::new("").to_path_buf(),
             level: 0,
             verbose: false,
+            rng: Box::new(botan::RandomNumberGenerator::new().unwrap()),
+            pbkdf: PBKDFParams::new(),
         }
     }
 }

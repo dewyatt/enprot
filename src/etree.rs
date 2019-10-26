@@ -125,7 +125,7 @@ pub enum TextNode {
     Encrypted {
         keyw: String,
         txt: TextTree,
-        phc: Option<String>, // PBKDF PHC string
+        pbkdf: Option<String>, // PBKDF PHC string
     },
     BeginEnd {
         keyw: String,
@@ -223,7 +223,7 @@ fn parse_encrypted(
         extfields.insert(key.to_string(), value.to_string());
     }
     let param_count = cmd.len() - extfields.len();
-    let phc: Option<String> = extfields.remove("pbkdf");
+    let pbkdf: Option<String> = extfields.remove("pbkdf");
     if !extfields.is_empty() {
         return Err("Unrecognized extended field(s) present");
     }
@@ -236,7 +236,7 @@ fn parse_encrypted(
             pstack.push(TextNode::Encrypted {
                 keyw: cmd[0].to_owned(),
                 txt: text.to_vec(),
-                phc,
+                pbkdf,
             });
             text.clear();
             return Ok(());
@@ -245,6 +245,9 @@ fn parse_encrypted(
             // CAS parameter
             // <( ENCRYPTED Agent_007 7a8da017c0fe671ba16f4bc55b884444e708849290d8366f19c552c90950b8c2 )>
             // <( ENCRYPTED Agent_007 7a8da017c0fe671ba16f4bc55b884444e708849290d8366f19c552c90950b8c2 pbkdf:... )>
+            if cmd[1].len() != 64 {
+                return Err("Invalid CAS identifier");
+            }
             let node = vec![TextNode::Stored {
                 keyw: "ct".to_string(),
                 cas: cmd[1].to_string(),
@@ -252,7 +255,7 @@ fn parse_encrypted(
             text.push(TextNode::Encrypted {
                 keyw: cmd[0].to_string(),
                 txt: node,
-                phc,
+                pbkdf,
             });
         }
         _ => {
@@ -302,7 +305,7 @@ fn parse_end(
             text.push(node);
             paops.level -= 1;
         }
-        Some(TextNode::Encrypted { keyw, txt, phc }) => {
+        Some(TextNode::Encrypted { keyw, txt, pbkdf }) => {
             // keyword mismatch ?
             if keyw != cmd[0] {
                 eprintln!(
@@ -330,7 +333,7 @@ fn parse_end(
                     let node = TextNode::Encrypted {
                         keyw: keyw,
                         txt: text.to_vec(),
-                        phc,
+                        pbkdf,
                     };
                     *text = txt;
                     text.push(node);
@@ -454,7 +457,7 @@ where
                 Some(TextNode::Encrypted {
                     keyw,
                     txt: _,
-                    phc: _,
+                    pbkdf: _,
                 }) => {
                     eprintln!("Parse: ENCRYPTED {} without END.", keyw);
                 }
@@ -491,9 +494,13 @@ pub fn tree_write<W: Write>(outw: &mut W, text: &TextTree, paops: &mut ParseOps)
             }
 
             // ENCRYPTED block
-            TextNode::Encrypted { keyw, txt, ref phc } => {
+            TextNode::Encrypted {
+                keyw,
+                txt,
+                ref pbkdf,
+            } => {
                 if let TextNode::Stored { keyw: _, ref cas } = txt[0] {
-                    if *phc == None {
+                    if *pbkdf == None {
                         writeln!(
                             outw,
                             "{} ENCRYPTED {} {} {}",
@@ -507,13 +514,13 @@ pub fn tree_write<W: Write>(outw: &mut W, text: &TextTree, paops: &mut ParseOps)
                             paops.left_sep,
                             keyw,
                             cas,
-                            &phc.clone().unwrap(),
+                            &pbkdf.clone().unwrap(),
                             paops.right_sep
                         )
                         .unwrap();
                     }
                 } else {
-                    if *phc == None {
+                    if *pbkdf == None {
                         writeln!(
                             outw,
                             "{} ENCRYPTED {} {}",
@@ -526,7 +533,7 @@ pub fn tree_write<W: Write>(outw: &mut W, text: &TextTree, paops: &mut ParseOps)
                             "{} ENCRYPTED {} {} {}",
                             paops.left_sep,
                             keyw,
-                            &phc.clone().unwrap(),
+                            &pbkdf.clone().unwrap(),
                             paops.right_sep
                         )
                         .unwrap();
@@ -594,7 +601,7 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
                     }
 
                     // encrypt
-                    let (ct, phc) = prot::encrypt(pt, pass);
+                    let (ct, pbkdf) = prot::encrypt(pt, pass);
 
                     // also store it (store at CAS) ?
                     let node = if paops.store.contains(keyw) {
@@ -609,7 +616,7 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
                     text_out.push(TextNode::Encrypted {
                         keyw: keyw.to_string(),
                         txt: node,
-                        phc,
+                        pbkdf,
                     });
                     continue;
                 }
@@ -641,7 +648,7 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
             TextNode::Encrypted {
                 ref keyw,
                 ref txt,
-                ref phc,
+                ref pbkdf,
             } => {
                 // decrypt it
                 if paops.decrypt.contains(keyw) {
@@ -667,7 +674,7 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
                     }
 
                     // decrypt
-                    let pt = match prot::decrypt(ct, pass, phc) {
+                    let pt = match prot::decrypt(ct, pass, pbkdf) {
                         Some(ct) => ct.to_vec(),
                         _ => {
                             eprintln!("Bad password for {}.", &keyw);
@@ -700,7 +707,7 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
                         text_out.push(TextNode::Encrypted {
                             keyw: keyw.to_string(),
                             txt: node,
-                            phc: None,
+                            pbkdf: None,
                         });
                         continue;
                     }
@@ -720,7 +727,7 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
                         text_out.push(TextNode::Encrypted {
                             keyw: keyw.to_string(),
                             txt: node,
-                            phc: None,
+                            pbkdf: None,
                         });
                         continue;
                     };

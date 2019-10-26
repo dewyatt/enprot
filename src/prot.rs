@@ -47,19 +47,20 @@ pub fn get_password(name: &str, rep: bool) -> String {
 
 // Encrypt
 
-pub fn encrypt(pt: Vec<u8>, password: Vec<u8>) -> Vec<u8> {
+pub fn encrypt(pt: Vec<u8>, password: Vec<u8>) -> (Vec<u8>, Option<String>) {
     let no_ad = vec![vec![]];
     let mut sivkey = [0; 64];
     let mut khash = Sha3::sha3_512();
     khash.input(&password);
     khash.result(&mut sivkey);
 
-    Aes256Siv::new(&sivkey).seal(&no_ad, &pt)
+    // TODO
+    (Aes256Siv::new(&sivkey).seal(&no_ad, &pt), None)
 }
 
 // Decrypt
 
-pub fn decrypt(ct: Vec<u8>, password: Vec<u8>) -> Option<Vec<u8>> {
+pub fn decrypt(ct: Vec<u8>, password: Vec<u8>, _phc: &Option<String>) -> Option<Vec<u8>> {
     let no_ad = vec![vec![]];
     let mut sivkey = [0; 64];
     let mut khash = Sha3::sha3_512();

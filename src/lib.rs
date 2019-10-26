@@ -296,6 +296,8 @@ where
                 ::std::process::exit(1);
             }
         };
+        println!("{:#?}", tree_in);
+        std::process::exit(0);
 
         // transform it
         if paops.verbose {

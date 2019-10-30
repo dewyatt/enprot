@@ -152,6 +152,8 @@ pub fn from_phc_alg(alg: &str) -> (String, Option<String>) {
 }
 
 fn format_phc(alg: &str, params: &HashMap<String, usize>, salt: &Vec<u8>) -> String {
+    let mut params: Vec<_> = params.iter().collect();
+    params.sort_by(|a, b| a.0.cmp(b.0));
     format!(
         "${}${}${}",
         alg,

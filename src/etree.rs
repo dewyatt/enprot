@@ -31,11 +31,8 @@ use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 
 use cas;
+use consts;
 use prot;
-
-const DEFAULT_PBKDF_SALT_LEN: usize = 16;
-const DEFAULT_PBKDF_ALG: &'static str = "argon2id";
-const DEFAULT_PBKDF_MSEC: u32 = 200;
 
 pub trait RNGRead {
     fn rng_read(&self, len: usize) -> Result<Vec<u8>, botan::Error>;
@@ -47,24 +44,23 @@ impl RNGRead for botan::RandomNumberGenerator {
     }
 }
 
-pub struct PBKDFParams {
-    pub alg: String,    // algorithm name
-    pub saltlen: usize, // salt length
-    pub msec: u32,      // millis count to calc KDF params
-    pub param1: usize,  // param1 (used if msec == 0)
-    pub param2: usize,  // param2 (used if msec == 0),
-    pub param3: usize,  // param3 (used if msec == 0)
+pub struct PBKDFOptions {
+    pub alg: String,       // algorithm name
+    pub saltlen: usize,    // salt length
+    pub msec: Option<u32>, // millis count to calc KDF params
+
+    pub pbkdf2_hash: Option<String>,
+    pub params: Option<HashMap<String, usize>>,
 }
 
-impl PBKDFParams {
-    pub fn new() -> PBKDFParams {
-        PBKDFParams {
-            alg: DEFAULT_PBKDF_ALG.to_string(),
-            saltlen: DEFAULT_PBKDF_SALT_LEN,
-            msec: DEFAULT_PBKDF_MSEC,
-            param1: 0,
-            param2: 0,
-            param3: 0,
+impl PBKDFOptions {
+    pub fn new() -> PBKDFOptions {
+        PBKDFOptions {
+            alg: consts::DEFAULT_PBKDF_ALG.to_string(),
+            saltlen: consts::DEFAULT_PBKDF_SALT_LEN,
+            msec: Some(consts::DEFAULT_PBKDF_MSEC),
+            pbkdf2_hash: None,
+            params: None,
         }
     }
 }
@@ -72,26 +68,26 @@ impl PBKDFParams {
 // parse operations
 
 pub struct ParseOps {
-    pub left_sep: String,                    // left separator
-    pub right_sep: String,                   // right separator
-    pub store: HashSet<String>,              // keywords to store
-    pub fetch: HashSet<String>,              // keywords to fetch
-    pub encrypt: HashSet<String>,            // keywords to encrypt
-    pub decrypt: HashSet<String>,            // keywords to decrypt
-    pub passwords: HashMap<String, Vec<u8>>, // passwords
-    pub fname: String,                       // file name being parsed
-    pub casdir: PathBuf,                     // directory for cas objects
-    pub verbose: bool,                       // verbose output to stdout
-    pub rng: Box<dyn RNGRead>,               // RNG to use
-    pub pbkdf: PBKDFParams,                  // the PBKDF parameters
-    level: isize,                            // current recursion level
+    pub left_sep: String,                   // left separator
+    pub right_sep: String,                  // right separator
+    pub store: HashSet<String>,             // keywords to store
+    pub fetch: HashSet<String>,             // keywords to fetch
+    pub encrypt: HashSet<String>,           // keywords to encrypt
+    pub decrypt: HashSet<String>,           // keywords to decrypt
+    pub passwords: HashMap<String, String>, // passwords
+    pub fname: String,                      // file name being parsed
+    pub casdir: PathBuf,                    // directory for cas objects
+    pub verbose: bool,                      // verbose output to stdout
+    pub rng: Option<Box<dyn RNGRead>>,      // RNG to use
+    pub pbkdf: PBKDFOptions,                // the PBKDF options
+    level: isize,                           // current recursion level
 }
 
 impl ParseOps {
     pub fn new() -> ParseOps {
         ParseOps {
-            left_sep: "// <(".to_string(),
-            right_sep: ")>".to_string(),
+            left_sep: consts::DEFAULT_LEFT_SEP.to_string(),
+            right_sep: consts::DEFAULT_RIGHT_SEP.to_string(),
             store: HashSet::new(),
             fetch: HashSet::new(),
             encrypt: HashSet::new(),
@@ -101,8 +97,8 @@ impl ParseOps {
             casdir: Path::new("").to_path_buf(),
             level: 0,
             verbose: false,
-            rng: Box::new(botan::RandomNumberGenerator::new().unwrap()),
-            pbkdf: PBKDFParams::new(),
+            rng: Some(Box::new(botan::RandomNumberGenerator::new().unwrap())),
+            pbkdf: PBKDFOptions::new(),
         }
     }
 }
@@ -510,7 +506,7 @@ pub fn tree_write<W: Write>(outw: &mut W, text: &TextTree, paops: &mut ParseOps)
                     } else {
                         writeln!(
                             outw,
-                            "{} ENCRYPTED {} {} {} {}",
+                            "{} ENCRYPTED {} {} pbkdf:{} {}",
                             paops.left_sep,
                             keyw,
                             cas,
@@ -530,7 +526,7 @@ pub fn tree_write<W: Write>(outw: &mut W, text: &TextTree, paops: &mut ParseOps)
                     } else {
                         writeln!(
                             outw,
-                            "{} ENCRYPTED {} {} {}",
+                            "{} ENCRYPTED {} pbkdf:{} {}",
                             paops.left_sep,
                             keyw,
                             &pbkdf.clone().unwrap(),
@@ -591,8 +587,8 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
 
                     // get password
                     let (newpass, pass) = match paops.passwords.get(keyw) {
-                        Some(pass) => (false, pass.to_vec()),
-                        None => (true, prot::get_password(&keyw, true).as_bytes().to_vec()),
+                        Some(pass) => (false, pass.to_string()),
+                        None => (true, prot::get_password(&keyw, true)),
                     };
                     if newpass {
                         paops
@@ -601,7 +597,7 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
                     }
 
                     // encrypt
-                    let (ct, pbkdf) = prot::encrypt(pt, pass);
+                    let (ct, pbkdf) = prot::encrypt(pt, &pass, &paops.rng, &paops.pbkdf)?;
 
                     // also store it (store at CAS) ?
                     let node = if paops.store.contains(keyw) {
@@ -664,8 +660,8 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
 
                     // get password
                     let (newpass, pass) = match paops.passwords.get(keyw) {
-                        Some(pass) => (false, pass.to_vec()),
-                        None => (true, prot::get_password(keyw, false).as_bytes().to_vec()),
+                        Some(pass) => (false, pass.to_string()),
+                        None => (true, prot::get_password(keyw, false)),
                     };
                     if newpass {
                         paops
@@ -674,11 +670,11 @@ pub fn transform(text_in: &TextTree, mut paops: &mut ParseOps) -> Result<TextTre
                     }
 
                     // decrypt
-                    let pt = match prot::decrypt(ct, pass, pbkdf) {
-                        Some(ct) => ct.to_vec(),
-                        _ => {
-                            eprintln!("Bad password for {}.", &keyw);
-                            return Err("Decryption failure");
+                    let pt = match prot::decrypt(ct, &pass, pbkdf) {
+                        Ok(ct) => ct.to_vec(),
+                        Err(e) => {
+                            eprintln!("Error decrypting {}: {}.", &keyw, e);
+                            return Err(e);
                         }
                     };
 
@@ -907,13 +903,14 @@ mod tests {
 
     // test that we can do a basic encrypt and decrypt on this file
     #[test]
-    fn transform_test_ept_encrypt_decyprt_geheim() {
+    fn transform_test_ept_encrypt_decrypt_geheim() {
         let (intree, mut paops, _casdir) = parse_ept("sample/test.ept");
+        paops.pbkdf.alg = "legacy".to_string();
         // encrypt
         paops.encrypt.insert("GEHEIM".to_string());
         paops
-            .keys
-            .insert("GEHEIM".to_string(), "password".as_bytes().to_vec());
+            .passwords
+            .insert("GEHEIM".to_string(), "password".to_string());
         let outtree = transform(&intree, &mut paops).unwrap();
         // re-parse
         parse(
@@ -942,12 +939,13 @@ mod tests {
     #[test]
     fn transform_test_ept_encrypt_store_agent007() {
         let (intree, mut paops, _casdir) = parse_ept("sample/test.ept");
+        paops.pbkdf.alg = "legacy".to_string();
         // encrypt & store
         paops.encrypt.insert("Agent_007".to_string());
         paops.store.insert("Agent_007".to_string());
         paops
-            .keys
-            .insert("Agent_007".to_string(), "password".as_bytes().to_vec());
+            .passwords
+            .insert("Agent_007".to_string(), "password".to_string());
         let outtree = transform(&intree, &mut paops).unwrap();
         // re-parse
         parse(

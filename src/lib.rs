@@ -192,6 +192,14 @@ where
                 .help("Advanced option for testing, do not use"),
         )
         .arg(
+            Arg::with_name("pbkdf-salt")
+                .long("pbkdf-salt")
+                .takes_value(true)
+                .value_name("HEX")
+                .hidden(true)
+                .help("Advanced option for testing, do not use"),
+        )
+        .arg(
             Arg::with_name("pbkdf2-hash")
                 .long("pbkdf2-hash")
                 .takes_value(true)
@@ -328,6 +336,9 @@ where
             (parts[0].to_string(), parts[1].parse::<usize>().unwrap())
         }));
         paops.pbkdf.params = Some(params);
+    }
+    if let Some(val) = matches.value_of("pbkdf-salt") {
+        paops.pbkdf.salt = Some(hex::decode(val).unwrap());
     }
     if matches.occurrences_of("pbkdf2-hash") != 0 {
         if paops.pbkdf.alg != "pbkdf2" {

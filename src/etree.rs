@@ -45,12 +45,12 @@ impl RNGRead for botan::RandomNumberGenerator {
 }
 
 pub struct PBKDFOptions {
-    pub alg: String,       // algorithm name
-    pub saltlen: usize,    // salt length
-    pub msec: Option<u32>, // millis count to calc KDF params
-
-    pub pbkdf2_hash: Option<String>,
-    pub params: Option<HashMap<String, usize>>,
+    pub alg: String,                            // algorithm name
+    pub pbkdf2_hash: Option<String>,            // hash alg to use when alg is PBKDF2
+    pub saltlen: usize,                         // desired salt length
+    pub salt: Option<Vec<u8>>,                  // salt (randomly generated if None)
+    pub msec: Option<u32>,                      // desired millis count to determine KDF params
+    pub params: Option<HashMap<String, usize>>, // KDF-specific params (if provided)
 }
 
 impl PBKDFOptions {
@@ -58,6 +58,7 @@ impl PBKDFOptions {
         PBKDFOptions {
             alg: consts::DEFAULT_PBKDF_ALG.to_string(),
             saltlen: consts::DEFAULT_PBKDF_SALT_LEN,
+            salt: None,
             msec: Some(consts::DEFAULT_PBKDF_MSEC),
             pbkdf2_hash: None,
             params: None,

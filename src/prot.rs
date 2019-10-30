@@ -57,7 +57,7 @@ pub fn encrypt(
     rng: &Option<Box<dyn etree::RNGRead>>,
     opts: &etree::PBKDFOptions,
 ) -> Result<(Vec<u8>, Option<String>), &'static str> {
-    let (key, pbkdf) = derive_key(password, None, rng, opts)?;
+    let (key, pbkdf) = derive_key(password, rng, opts)?;
     let no_ad = vec![vec![]];
     Ok((Aes256Siv::new(&key).seal(&no_ad, &pt), pbkdf))
 }
@@ -79,27 +79,28 @@ pub fn decrypt(
                 .iter()
                 .map(|v| (v.0.to_string(), v.1.parse::<usize>().unwrap())),
         );
-        let opts = etree::PBKDFOptions {
-            alg: alg,
-            saltlen: 0,
-            msec: None,
-            pbkdf2_hash: pbkdf2_hash,
-            params: Some(params_map),
-        };
         let salt = match phc.salt().ok_or("Missing salt")? {
             phc::Salt::Ascii(s) => base64::decode(s).map_err(|_| "Failed to retrieve salt")?,
             phc::Salt::Binary(b) => base64::decode(b).map_err(|_| "Failed to retrieve salt")?,
         };
-        let (thekey, _) = derive_key(password, Some(salt), &None, &opts)?;
+        let opts = etree::PBKDFOptions {
+            alg: alg,
+            saltlen: 0,
+            salt: Some(salt),
+            msec: None,
+            pbkdf2_hash: pbkdf2_hash,
+            params: Some(params_map),
+        };
+        let (thekey, _) = derive_key(password, &None, &opts)?;
         key = thekey;
     } else {
         let (thekey, _) = derive_key(
             password,
-            None,
             &None,
             &etree::PBKDFOptions {
                 alg: "legacy".to_string(),
                 saltlen: 0,
+                salt: None,
                 msec: None,
                 pbkdf2_hash: None,
                 params: None,

@@ -271,3 +271,83 @@ fn encrypt_decrypt_agent007_geheim() {
         &fs::read_to_string(&ept.source).unwrap(),
     );
 }
+
+#[test]
+fn encrypt_decrypt_agent007_default_pbkdf() {
+    let casdir = tempdir().unwrap();
+    let ept = Fixture::copy("sample/test.ept");
+
+    Command::cargo_bin("enprot")
+        .unwrap()
+        .arg("-c")
+        .arg(casdir.path())
+        .arg("-e")
+        .arg("Agent_007")
+        .arg("-k")
+        .arg("Agent_007=password")
+        .arg(&ept.path)
+        .assert()
+        .success();
+    // just make sure it selected argon2
+    assert!(&fs::read_to_string(&ept.path)
+        .unwrap()
+        .contains("pbkdf:$argon2$"));
+    Command::cargo_bin("enprot")
+        .unwrap()
+        .arg("-c")
+        .arg(casdir.path())
+        .arg("-d")
+        .arg("Agent_007")
+        .arg("-k")
+        .arg("Agent_007=password")
+        .arg(&ept.path)
+        .assert()
+        .success();
+    assert_eq!(
+        &fs::read_to_string(&ept.path).unwrap(),
+        &fs::read_to_string(&ept.source).unwrap()
+    );
+}
+
+#[test]
+fn encrypt_decrypt_agent007_pbkdf2() {
+    let casdir = tempdir().unwrap();
+    let ept = Fixture::copy("sample/test.ept");
+
+    Command::cargo_bin("enprot")
+        .unwrap()
+        .arg("-c")
+        .arg(casdir.path())
+        .arg("-e")
+        .arg("Agent_007")
+        .arg("--pbkdf")
+        .arg("pbkdf2")
+        .arg("--pbkdf-params")
+        .arg("i=1")
+        .arg("--pbkdf-salt")
+        .arg("0102030405060708")
+        .arg("-k")
+        .arg("Agent_007=password")
+        .arg(&ept.path)
+        .assert()
+        .success();
+    assert_eq!(
+        &fs::read_to_string(&ept.path).unwrap(),
+        &fs::read_to_string("test-data/test-encrypt-agent007-pbkdf2.ept").unwrap()
+    );
+    Command::cargo_bin("enprot")
+        .unwrap()
+        .arg("-c")
+        .arg(casdir.path())
+        .arg("-d")
+        .arg("Agent_007")
+        .arg("-k")
+        .arg("Agent_007=password")
+        .arg(&ept.path)
+        .assert()
+        .success();
+    assert_eq!(
+        &fs::read_to_string(&ept.path).unwrap(),
+        &fs::read_to_string(&ept.source).unwrap()
+    );
+}

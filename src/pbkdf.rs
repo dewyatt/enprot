@@ -166,7 +166,6 @@ fn format_phc(alg: &str, params: &HashMap<String, usize>, salt: &Vec<u8>) -> Str
 
 pub fn derive_key(
     password: &str,
-    salt: Option<Vec<u8>>,
     rng: &Option<Box<dyn etree::RNGRead>>,
     opts: &etree::PBKDFOptions,
 ) -> Result<(Vec<u8>, Option<String>), &'static str> {
@@ -174,7 +173,7 @@ pub fn derive_key(
         return Ok((pbkdf_legacy(password), None));
     }
     let botan_alg = botan_pbkdf_name(&opts.alg, &opts.pbkdf2_hash)?;
-    let salt = salt.unwrap_or_else(|| {
+    let salt = opts.salt.clone().unwrap_or_else(|| {
         rng.as_ref()
             .unwrap()
             .rng_read(opts.saltlen)

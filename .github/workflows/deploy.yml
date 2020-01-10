@@ -38,7 +38,7 @@ jobs:
               TARGET_CC: x86_64-w64-mingw32-gcc-posix
               TARGET_CXX: x86_64-w64-mingw32-g++-posix
               TARGET_AR: x86_64-w64-mingw32-gcc-ar-posix
-              EXE_NAME: ${{ env.PROJECT_NAME }}.exe
+              EXE_NAME: enprot.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v1

@@ -2,6 +2,7 @@
 : "${RELEASE_TAG=${GITHUB_REF#refs/tags/}}"
 . ci/common.inc.sh
 
+# strip
 mkdir .cargo
 cat <<EOF > .cargo/config
 [target.$TARGET]

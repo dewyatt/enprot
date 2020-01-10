@@ -1,5 +1,5 @@
 # TODO: maybe check DLL dependencies here
-file "target/$TARGET/release/enprot.exe"
+file "$EXE_PATH"
 
-docker run --rm -v "$PWD:/project" -w "/project" "$img" wine "target/$TARGET/release/enprot.exe" --version
+docker run --rm -v "$PWD:/project" -w "/project" "$img" wine "$EXE_PATH" --version
 

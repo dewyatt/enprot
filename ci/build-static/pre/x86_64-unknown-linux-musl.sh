@@ -2,7 +2,7 @@
 . ci/common.inc.sh
 
 # build a docker image with native deps
-img="enprot/cross-build:$TARGET"
+img="$PROJECT_NAME/cross-build:$TARGET"
 target=${TARGET^^}
 docker build -t "$img" -<<EOF
 FROM rustembedded/cross:$TARGET-$CROSS_VERSION

@@ -1,5 +1,5 @@
 # check
-file "target/$TARGET/release/enprot" | grep 'statically linked'
+file "$EXE_PATH" | grep 'statically linked'
 
-"target/$TARGET/release/enprot" --version
+"$EXE_PATH" --version
 

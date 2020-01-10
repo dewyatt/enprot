@@ -7,6 +7,8 @@ on:
 env:
   CROSS_VERSION: 0.1.16
   BOTAN: 2.12.1
+  PROJECT_NAME: enprot
+  EXE_NAME: ${{ env.PROJECT_NAME }}
 
 jobs:
   release-archive:
@@ -36,10 +38,11 @@ jobs:
               TARGET_CC: x86_64-w64-mingw32-gcc-posix
               TARGET_CXX: x86_64-w64-mingw32-g++-posix
               TARGET_AR: x86_64-w64-mingw32-gcc-ar-posix
+              EXE_NAME: ${{ env.PROJECT_NAME }}.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v1
-
+      # install rust
       - name: Install rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -47,14 +50,16 @@ jobs:
             toolchain: stable
             target: ${{ matrix.env.TARGET }}
             default: true
-
+      # create our archives
       - name: Create archive
         env: ${{ matrix.env }}
         run: |
-          set -eux
+          set -euxo pipefail
           RELEASE_TAG=${GITHUB_REF#refs/tags/}
+          EXE_PATH="target/$TARGET/release/$EXE_NAME"
           . ci/build-static.sh
           . ci/archive.sh
+      # upload archives for use by release jobs
       - name: Upload artifacts
         uses: actions/upload-artifact@v1
         with:
@@ -66,15 +71,18 @@ jobs:
     needs: [release-archive]
     runs-on: ubuntu-latest
     steps:
+      # download our archive artifacts
       - name: Download artifacts
         uses: actions/download-artifact@v1
         with:
           name: archives
+      # create a github release
+      # this is ultimately easier than @actions/create-release et al
       - name: Create release
         env:
           GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -eux
+          set -euxo pipefail
           RELEASE_TAG=${GITHUB_REF#refs/tags/}
           git clone https://github.com/riboseinc/create-github-release
           cd create-github-release
@@ -83,7 +91,6 @@ jobs:
           export PATH="$PATH:$GEM_HOME/bin"
           gem install --no-document bundler -v "$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1)"
           bundle install
-          # this ends up being much easier than @actions/create-release et al
           bundle exec ./create-github-release.rb \
             ${{ github.repository }} \
             "$RELEASE_TAG" \

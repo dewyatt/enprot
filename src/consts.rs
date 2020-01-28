@@ -21,15 +21,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use phf::phf_set;
-
-// pbkdf
-pub const DEFAULT_PBKDF_ALG: &str = "argon2";
-pub const DEFAULT_PBKDF_SALT_LEN: usize = 16;
-pub const DEFAULT_PBKDF_MSEC: u32 = 100;
-
-// cipher
-pub const DEFAULT_CIPHER_ALG: &str = "aes-256-siv";
 pub const VALID_CIPHER_ALGS: &[&str] = &["aes-256-siv", "aes-256-gcm", "aes-256-gcm-siv"];
 
 // parsing separators
@@ -48,21 +39,3 @@ pub const VALID_PBKDF_ALGS: &[&str] = &[
 // policies
 pub const VALID_POLICIES: &[&str] = &["none", "nist"];
 pub const DEFAULT_POLICY: &str = "none";
-
-// NIST
-pub static NIST_APPROVED_PBKDFS: phf::Set<&'static str> = phf_set! {
-    "pbkdf2-sha256",
-    "pbkdf2-sha512",
-};
-pub static NIST_APPROVED_CIPHERS: phf::Set<&'static str> = phf_set! {
-    "aes-256-gcm",
-};
-pub static NIST_APPROVED_HASHES: phf::Set<&'static str> = phf_set! {
-    "sha3-256",
-    "sha3-512",
-};
-pub static NIST_PBKDF_MIN_SALT_LEN: usize = 16;
-// NIST defaults
-pub static NIST_DEFAULT_PBKDF: &str = "pbkdf2-sha512";
-pub static NIST_DEFAULT_SALT_LEN: usize = 32;
-pub static NIST_DEFAULT_CIPHER: &str = "aes-256-gcm";

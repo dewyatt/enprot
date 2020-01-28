@@ -62,3 +62,7 @@ pub static NIST_APPROVED_HASHES: phf::Set<&'static str> = phf_set! {
     "sha3-512",
 };
 pub static NIST_PBKDF_MIN_SALT_LEN: usize = 16;
+// NIST defaults
+pub static NIST_DEFAULT_PBKDF: &str = "pbkdf2-sha512";
+pub static NIST_DEFAULT_SALT_LEN: usize = 32;
+pub static NIST_DEFAULT_CIPHER: &str = "aes-256-gcm";

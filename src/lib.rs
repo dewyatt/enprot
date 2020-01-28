@@ -43,11 +43,12 @@ pub mod utils;
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;
+use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
-use clap::{App, AppSettings, Arg, ArgSettings};
+use clap::{App, AppSettings, Arg, ArgSettings, ErrorKind};
 
 fn validate_positive<T>(v: String) -> Result<(), String>
 where
@@ -57,6 +58,16 @@ where
     v.parse::<T>()
         .map_err(|_| err.clone())
         .and_then(|n| if n != T::zero() { Ok(()) } else { Err(err) })
+}
+
+fn err_exit(app: &mut App, desc: &str, kind: ErrorKind, show_help: bool) -> ! {
+    if show_help {
+        app.print_help().unwrap();
+        eprintln!("");
+    }
+    let err = clap::Error::with_description(desc, kind);
+    eprintln!("{}", err);
+    std::process::exit(1);
 }
 
 // Handle command line parameters
@@ -75,7 +86,7 @@ where
     let default_pbkdf_msec = consts::DEFAULT_PBKDF_MSEC.to_string();
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
-    let app = App::new("enprot")
+    let mut app = App::new("enprot")
         .version(VERSION)
         .setting(AppSettings::DeriveDisplayOrder)
         .setting(AppSettings::ColoredHelp)
@@ -180,6 +191,9 @@ where
                 .possible_values(consts::VALID_POLICIES)
                 .help("Set the policy to restrict cryptographic algorithms"),
         )
+        .arg(Arg::with_name("fips").long("fips").help(
+            "Select and enforce the use of FIPS-compliant algorithms (implies --policy=nist)",
+        ))
         .arg(
             Arg::with_name("pbkdf")
                 .long("pbkdf")
@@ -386,14 +400,53 @@ where
     if let Some(iv) = matches.value_of("cipher-iv") {
         paops.cipheropts.iv = Some(hex::decode(iv).unwrap());
     }
-    //policy
-    paops.policy = match matches.value_of("policy").unwrap() {
+    // check for FIPS mode
+    let fips = matches.occurrences_of("fips") != 0
+        || (cfg!(unix)
+            && match fs::read_to_string("/proc/sys/crypto/fips_enabled") {
+                Ok(str) => str.chars().next() == Some('1'),
+                Err(_) => false,
+            });
+    let mut policy = matches.value_of("policy").unwrap();
+    if fips {
+        // see if the user specified a conflicting policy
+        if matches.occurrences_of("policy") != 0 && policy != "nist" {
+            err_exit(
+                &mut app,
+                &format!("Policy setting of '{}' conflicts with --fips", policy),
+                ErrorKind::ArgumentConflict,
+                false,
+            );
+        }
+        // override policy
+        policy = "nist";
+        // set some sane defaults if not set
+        // anything that the user did set will be validated by the policy later
+        if matches.occurrences_of("pbkdf") == 0 {
+            paops.pbkdf.alg = consts::NIST_DEFAULT_PBKDF.to_string();
+        }
+        if matches.occurrences_of("pbkdf-salt-len") == 0 {
+            paops.pbkdf.saltlen = consts::NIST_DEFAULT_SALT_LEN;
+        }
+        if matches.occurrences_of("cipher") == 0 {
+            paops.cipheropts.alg = consts::NIST_DEFAULT_CIPHER.to_string();
+        }
+    }
+    // policy
+    paops.policy = match policy {
         "none" => Box::new(crypto::CryptoPolicyNone {}),
         "nist" => Box::new(crypto::CryptoPolicyNIST::new()),
-        _ => {
-            std::process::exit(1);
+        value => {
+            // shouldn't happen
+            err_exit(
+                &mut app,
+                &format!("Invalid policy: '{}'", value),
+                ErrorKind::InvalidValue,
+                true,
+            );
         }
     };
+    assert!(!fips || (fips && policy == "nist"));
 
     // print some of the processing parameters if verbose
     if paops.verbose {
@@ -401,8 +454,19 @@ where
             "LEFT_SEP='{}' RIGHT_SEP='{}' casdir = '{}'",
             paops.left_sep,
             paops.right_sep,
-            paops.casdir.display()
+            paops.casdir.display(),
         );
+        /* TODO remove
+        eprintln!("pbkdf");
+        eprintln!("  alg: {}", paops.pbkdf.alg);
+        eprintln!("  saltlen: {}", paops.pbkdf.saltlen);
+        eprintln!("  salt: {:?}", paops.pbkdf.salt);
+        eprintln!("  msec: {:?}", paops.pbkdf.msec);
+        eprintln!("  params: {:?}", paops.pbkdf.params);
+        eprintln!("cipheropts");
+        eprintln!("  alg: {}", paops.cipheropts.alg);
+        eprintln!("  iv: {:?}", paops.cipheropts.iv);
+        */
     }
 
     // process all files

@@ -66,9 +66,34 @@ pub trait CryptoPolicy {
     }
 }
 
-pub struct CryptoPolicyNone {}
+pub struct CryptoPolicyDefault {}
 
-impl CryptoPolicy for CryptoPolicyNone {}
+impl CryptoPolicyDefault {
+    pub fn new() -> CryptoPolicyDefault {
+        CryptoPolicyDefault {
+            ciphers: &consts::NIST_APPROVED_CIPHERS,
+            hashes: &consts::NIST_APPROVED_HASHES,
+            pbkdfs: &consts::NIST_APPROVED_PBKDFS,
+        }
+    }
+
+    fn check_alg(&self, kind: &str, alg: &str) -> Result<(), &'static str> {
+        let lst = match kind {
+            "Cipher" => &self.ciphers,
+            "Hash" => &self.hashes,
+            "PBKDF" => &self.pbkdfs,
+            _ => return Err("Invalid algorithm kind"),
+        };
+        if lst.contains(alg) {
+            Ok(())
+        } else {
+            eprintln!("{} algorithm is not permitted by policy: {}", kind, alg);
+            Err("Algorithm not permitted by policy")
+        }
+    }
+}
+
+impl CryptoPolicy for CryptoPolicyDefault {}
 
 pub struct CryptoPolicyNIST {
     pub ciphers: &'static phf::Set<&'static str>,
@@ -109,7 +134,7 @@ impl CryptoPolicy for CryptoPolicyNIST {
     fn check_pbkdf(
         &self,
         alg: &str,
-        _key_len: usize,
+        key_len: usize,
         _password: &str,
         salt: &[u8],
         params: &BTreeMap<String, usize>,
@@ -117,6 +142,9 @@ impl CryptoPolicy for CryptoPolicyNIST {
         self.check_alg("PBKDF", alg)?;
         if salt.len() < consts::NIST_PBKDF_MIN_SALT_LEN {
             return Err("Salt length violates policy");
+        }
+        if key_len < 14 {
+            return Err("Key length violates policy");
         }
         if let Some(iters) = params.get("i") {
             if *iters < 1000 {

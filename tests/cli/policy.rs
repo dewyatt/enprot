@@ -70,6 +70,49 @@ fn policy_nist_pbkdf() {
         .arg("-")
         .assert()
         .success();
+
+    // pbkdf2 requires a minimum iteration count
+    Command::cargo_bin("enprot")
+        .unwrap()
+        .arg("--policy")
+        .arg("nist")
+        .arg("--pbkdf-params")
+        .arg("i=999")
+        .arg("-e")
+        .arg("Agent_007")
+        .arg("-k")
+        .arg("Agent_007=password")
+        .arg("--pbkdf")
+        .arg("pbkdf2-sha256")
+        .arg("--cipher")
+        .arg("aes-256-gcm")
+        .arg(&ept.path)
+        .arg("-o")
+        .arg("-")
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("Iteration count violates policy"));
+
+    // pbkdf2 requires a minimum iteration count
+    Command::cargo_bin("enprot")
+        .unwrap()
+        .arg("--policy")
+        .arg("nist")
+        .arg("--pbkdf-params")
+        .arg("i=1000")
+        .arg("-e")
+        .arg("Agent_007")
+        .arg("-k")
+        .arg("Agent_007=password")
+        .arg("--pbkdf")
+        .arg("pbkdf2-sha256")
+        .arg("--cipher")
+        .arg("aes-256-gcm")
+        .arg(&ept.path)
+        .arg("-o")
+        .arg("-")
+        .assert()
+        .success();
 }
 
 #[test]
@@ -180,5 +223,47 @@ fn policy_nist_cipher() {
         .failure()
         .stderr(predicates::str::contains(
             "Cipher algorithm is not permitted by policy",
+        ));
+}
+
+#[test]
+fn fips_flag() {
+    let ept = Fixture::copy("sample/simple.ept");
+
+    // ensure we select some sane defaults
+    Command::cargo_bin("enprot")
+        .unwrap()
+        .arg("--fips")
+        .arg("-e")
+        .arg("Agent_007")
+        .arg("-k")
+        .arg("Agent_007=password")
+        .arg(&ept.path)
+        .arg("-o")
+        .arg("-")
+        .assert()
+        .success()
+        .stdout(
+            predicates::str::contains("pbkdf:$pbkdf2-sha512$")
+                .and(predicates::str::contains("cipher:aes-256-gcm$iv=")),
+        );
+
+    // should not be able to set a conflicting policy
+    Command::cargo_bin("enprot")
+        .unwrap()
+        .arg("--fips")
+        .arg("--policy")
+        .arg("none")
+        .arg("-e")
+        .arg("Agent_007")
+        .arg("-k")
+        .arg("Agent_007=password")
+        .arg(&ept.path)
+        .arg("-o")
+        .arg("-")
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains(
+            "Policy setting of 'none' conflicts with --fips",
         ));
 }

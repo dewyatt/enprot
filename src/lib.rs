@@ -71,6 +71,22 @@ fn err_exit(app: &mut App, desc: &str, kind: ErrorKind, show_help: bool) -> ! {
     std::process::exit(1);
 }
 
+fn make_policy(app: &mut App, name: &str) -> Box<dyn crypto::CryptoPolicy> {
+    match name {
+        "none" => Box::new(crypto::CryptoPolicyNone {}),
+        "nist" => Box::new(crypto::CryptoPolicyNIST {}),
+        value => {
+            // shouldn't happen
+            err_exit(
+                app,
+                &format!("Invalid policy: '{}'", value),
+                ErrorKind::InvalidValue,
+                true,
+            );
+        }
+    }
+}
+
 // Handle command line parameters
 
 pub fn app_main<I, T>(args: I)
@@ -189,6 +205,14 @@ where
                 .default_value(consts::DEFAULT_POLICY)
                 .possible_values(consts::VALID_POLICIES)
                 .help("Set the policy to restrict cryptographic algorithms"),
+        )
+        .arg(
+            Arg::with_name("defaults")
+                .long("defaults")
+                .takes_value(true)
+                .value_name("POLICY")
+                .possible_values(consts::VALID_POLICIES)
+                .help("Load settings from POLICY, but do not enforce the policy"),
         )
         .arg(Arg::with_name("fips").long("fips").help(
             "Select and enforce the use of FIPS-compliant algorithms (implies --policy=nist)",
@@ -336,22 +360,17 @@ where
     }
     assert!(!fips || (fips && policy == "nist"));
     // instantiate the actual policy
-    let policy: Box<dyn crypto::CryptoPolicy> = match policy {
-        "none" => Box::new(crypto::CryptoPolicyNone {}),
-        "nist" => Box::new(crypto::CryptoPolicyNIST {}),
-        value => {
-            // shouldn't happen
-            err_exit(
-                &mut app,
-                &format!("Invalid policy: '{}'", value),
-                ErrorKind::InvalidValue,
-                true,
-            );
-        }
-    };
+    let policy = make_policy(&mut app, policy);
 
     // the policy will set default crypto-related values
-    let mut paops = etree::ParseOps::new(policy);
+    let mut paops;
+    if let Some(defaults) = matches.value_of("defaults") {
+        paops = etree::ParseOps::new(make_policy(&mut app, defaults));
+        paops.policy = policy;
+    } else {
+        paops = etree::ParseOps::new(policy);
+    }
+
     // casdir
     if matches.occurrences_of("casdir") == 0 && Path::new("cas").is_dir() {
         paops.casdir = Path::new("cas").to_path_buf();
@@ -441,17 +460,16 @@ where
             paops.right_sep,
             paops.casdir.display(),
         );
-        /* TODO remove
+        // TODO remove
         eprintln!("pbkdf");
-        eprintln!("  alg: {}", paops.pbkdf.alg);
-        eprintln!("  saltlen: {}", paops.pbkdf.saltlen);
-        eprintln!("  salt: {:?}", paops.pbkdf.salt);
-        eprintln!("  msec: {:?}", paops.pbkdf.msec);
-        eprintln!("  params: {:?}", paops.pbkdf.params);
+        eprintln!("  alg: {}", paops.pbkdfopts.alg);
+        eprintln!("  saltlen: {}", paops.pbkdfopts.saltlen);
+        eprintln!("  salt: {:?}", paops.pbkdfopts.salt);
+        eprintln!("  msec: {:?}", paops.pbkdfopts.msec);
+        eprintln!("  params: {:?}", paops.pbkdfopts.params);
         eprintln!("cipheropts");
         eprintln!("  alg: {}", paops.cipheropts.alg);
         eprintln!("  iv: {:?}", paops.cipheropts.iv);
-        */
     }
 
     // process all files

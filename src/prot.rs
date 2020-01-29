@@ -158,8 +158,5 @@ pub fn decrypt(
         key = thekey;
     }
 
-    match dec.process(&key, &iv, &[], &ct, policy) {
-        Ok(pt) => Ok(pt),
-        Err(_) => Err("Bad password?"),
-    }
+    Ok(dec.process(&key, &iv, &[], &ct, policy)?)
 }

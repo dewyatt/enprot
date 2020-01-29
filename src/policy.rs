@@ -103,7 +103,8 @@ pub struct CryptoPolicyNIST {}
 impl CryptoPolicyNIST {
     const DEFAULT_PBKDF_ALG: &'static str = "pbkdf2-sha512";
     const DEFAULT_PBKDF_SALT_LEN: usize = 32;
-    const DEFAULT_PBKDF_MSEC: u32 = 100; // TODO
+    // no policy per se, so copy the default policy setting
+    const DEFAULT_PBKDF_MSEC: u32 = CryptoPolicyNone::DEFAULT_PBKDF_MSEC;
     const DEFAULT_CIPHER_ALG: &'static str = "aes-256-gcm";
     const NIST_APPROVED_PBKDFS: phf::Set<&'static str> = phf_set! {
         "pbkdf2-sha256",

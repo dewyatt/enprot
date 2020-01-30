@@ -73,7 +73,7 @@ fn err_exit(app: &mut App, desc: &str, kind: ErrorKind, show_help: bool) -> ! {
 
 fn make_policy(app: &mut App, name: &str) -> Box<dyn crypto::CryptoPolicy> {
     match name {
-        "none" => Box::new(crypto::CryptoPolicyNone {}),
+        "default" => Box::new(crypto::CryptoPolicyDefault {}),
         "nist" => Box::new(crypto::CryptoPolicyNIST {}),
         value => {
             // shouldn't happen

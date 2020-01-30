@@ -802,14 +802,14 @@ mod tests {
     use std::io::BufReader;
     use std::str;
 
-    use crypto::CryptoPolicyNone;
+    use crypto::CryptoPolicyDefault;
 
     fn parse_ept(ept_file: &str) -> (TextTree, ParseOps, tempfile::TempDir) {
         let casdir = tempdir().unwrap();
         let mut paops = ParseOps {
             fname: ept_file.to_string(),
             casdir: casdir.path().to_path_buf(),
-            ..ParseOps::new(Box::new(CryptoPolicyNone {}))
+            ..ParseOps::new(Box::new(CryptoPolicyDefault {}))
         };
         let tree = parse(
             BufReader::new(File::open(ept_file.to_string()).unwrap()),

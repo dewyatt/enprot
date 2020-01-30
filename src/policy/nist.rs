@@ -24,79 +24,8 @@
 use phf::phf_set;
 use std::collections::BTreeMap;
 
-pub trait CryptoPolicy {
-    fn check_hash(&self, alg: &str) -> Result<(), &'static str>;
-
-    fn check_pbkdf(
-        &self,
-        alg: &str,
-        key_len: usize,
-        password: &str,
-        salt: &[u8],
-        params: &BTreeMap<String, usize>,
-    ) -> Result<(), &'static str>;
-
-    fn check_cipher(&self, alg: &str, key: &[u8], iv: &[u8], ad: &[u8])
-        -> Result<(), &'static str>;
-
-    fn default_pbkdf_alg(&self) -> String;
-    fn default_pbkdf_salt_length(&self) -> usize;
-    fn default_pbkdf_millis(&self) -> u32;
-    fn default_cipher_alg(&self) -> String;
-}
-
-pub struct CryptoPolicyNone {}
-
-impl CryptoPolicyNone {
-    const DEFAULT_PBKDF_ALG: &'static str = "argon2";
-    const DEFAULT_PBKDF_SALT_LEN: usize = 16;
-    const DEFAULT_PBKDF_MSEC: u32 = 100;
-    const DEFAULT_CIPHER_ALG: &'static str = "aes-256-siv";
-}
-
-// allow everything
-impl CryptoPolicy for CryptoPolicyNone {
-    fn check_hash(&self, _alg: &str) -> Result<(), &'static str> {
-        Ok(())
-    }
-
-    fn check_pbkdf(
-        &self,
-        _alg: &str,
-        _key_len: usize,
-        _password: &str,
-        _salt: &[u8],
-        _params: &BTreeMap<String, usize>,
-    ) -> Result<(), &'static str> {
-        Ok(())
-    }
-
-    fn check_cipher(
-        &self,
-        _alg: &str,
-        _key: &[u8],
-        _iv: &[u8],
-        _ad: &[u8],
-    ) -> Result<(), &'static str> {
-        Ok(())
-    }
-
-    fn default_pbkdf_alg(&self) -> String {
-        Self::DEFAULT_PBKDF_ALG.to_string()
-    }
-
-    fn default_pbkdf_salt_length(&self) -> usize {
-        Self::DEFAULT_PBKDF_SALT_LEN
-    }
-
-    fn default_pbkdf_millis(&self) -> u32 {
-        Self::DEFAULT_PBKDF_MSEC
-    }
-
-    fn default_cipher_alg(&self) -> String {
-        Self::DEFAULT_CIPHER_ALG.to_string()
-    }
-}
+use policy::default::CryptoPolicyDefault;
+use policy::CryptoPolicy;
 
 pub struct CryptoPolicyNIST {}
 
@@ -104,7 +33,7 @@ impl CryptoPolicyNIST {
     const DEFAULT_PBKDF_ALG: &'static str = "pbkdf2-sha512";
     const DEFAULT_PBKDF_SALT_LEN: usize = 32;
     // no policy per se, so copy the default policy setting
-    const DEFAULT_PBKDF_MSEC: u32 = CryptoPolicyNone::DEFAULT_PBKDF_MSEC;
+    const DEFAULT_PBKDF_MSEC: u32 = CryptoPolicyDefault::DEFAULT_PBKDF_MSEC;
     const DEFAULT_CIPHER_ALG: &'static str = "aes-256-gcm";
     const NIST_APPROVED_PBKDFS: phf::Set<&'static str> = phf_set! {
         "pbkdf2-sha256",

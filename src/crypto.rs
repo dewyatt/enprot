@@ -24,9 +24,9 @@
 use phf::phf_map;
 use std::collections::BTreeMap;
 
+pub use policy::default::CryptoPolicyDefault;
+pub use policy::nist::CryptoPolicyNIST;
 pub use policy::CryptoPolicy;
-pub use policy::CryptoPolicyNIST;
-pub use policy::CryptoPolicyNone;
 
 pub static BOTAN_HASH_ALG_MAP: phf::Map<&'static str, &'static str> = phf_map! {
     "sha256" => "SHA-256",

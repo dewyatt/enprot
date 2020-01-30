@@ -204,7 +204,7 @@ fn fips_flag() {
         .unwrap()
         .arg("--fips")
         .arg("--policy")
-        .arg("none")
+        .arg("default")
         .arg("-e")
         .arg("Agent_007")
         .arg("-k")
@@ -215,6 +215,35 @@ fn fips_flag() {
         .assert()
         .failure()
         .stderr(predicates::str::contains(
-            "Policy setting of 'none' conflicts with --fips",
+            "Policy setting of 'default' conflicts with --fips",
         ));
 }
+
+/* TODO
+
+#[test]
+fn defaults_policy_conflict() {
+    let ept = Fixture::copy("sample/simple.ept");
+
+    // TODO
+    Command::cargo_bin("enprot")
+        .unwrap()
+        .arg("--policy")
+        .arg("nist")
+        .arg("--defaults")
+        .arg("none")
+        .arg("-e")
+        .arg("Agent_007")
+        .arg("-k")
+        .arg("Agent_007=password")
+        .arg(&ept.path)
+        .arg("-o")
+        .arg("-")
+        .assert()
+        .success()
+        .stdout(
+            predicates::str::contains("pbkdf:$pbkdf2-sha512$")
+                .and(predicates::str::contains("cipher:aes-256-gcm$iv=")),
+        );
+}
+*/

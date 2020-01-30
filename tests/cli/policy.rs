@@ -219,19 +219,17 @@ fn fips_flag() {
         ));
 }
 
-/* TODO
-
 #[test]
 fn defaults_policy_conflict() {
     let ept = Fixture::copy("sample/simple.ept");
 
-    // TODO
+    // nist policy conflicts with default settings
     Command::cargo_bin("enprot")
         .unwrap()
         .arg("--policy")
         .arg("nist")
         .arg("--defaults")
-        .arg("none")
+        .arg("default")
         .arg("-e")
         .arg("Agent_007")
         .arg("-k")
@@ -240,10 +238,6 @@ fn defaults_policy_conflict() {
         .arg("-o")
         .arg("-")
         .assert()
-        .success()
-        .stdout(
-            predicates::str::contains("pbkdf:$pbkdf2-sha512$")
-                .and(predicates::str::contains("cipher:aes-256-gcm$iv=")),
-        );
+        .failure()
+        .stderr(predicates::str::contains("not permitted by policy"));
 }
-*/

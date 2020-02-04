@@ -11,7 +11,20 @@ env:
   EXE_NAME: enprot
 
 jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v1
+      - run: |
+          if [ "$(grep '^version' Cargo.toml | cut -d '"' -f2)" != "${GITHUB_REF#refs/tags/}" ]; then
+            echo "Version tag does not match manifest"
+            exit 1
+          fi
+
   release-archive:
+    needs: [checks]
     name: archive
     timeout-minutes: 15
     strategy:

@@ -6,7 +6,6 @@ on:
 
 env:
   CROSS_VERSION: 0.1.16
-  BOTAN_VERSION: 2.13.0
   PROJECT_NAME: enprot
   EXE_NAME: enprot
 
@@ -29,6 +28,8 @@ jobs:
     needs: [checks]
     name: archive
     timeout-minutes: 15
+    env:
+      BOTAN_VERSION: 2.13.0
     strategy:
       matrix:
         target:
@@ -172,7 +173,7 @@ jobs:
             ../archives/*
 
   publish-crate:
-    name: publish crate
+    name: crates.io
     needs: [checks]
     runs-on: ubuntu-latest
     steps:
@@ -183,5 +184,6 @@ jobs:
         run: |
           set -euxo pipefail
           RELEASE_TAG=${GITHUB_REF#refs/tags/}
+          sudo apt-get -y install libbotan-2-dev
           cargo publish --dry-run
 

@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@v1
       - name: Check version
         run: |
+          set -euxo pipefail
           if [ "$(grep '^version' Cargo.toml | cut -d '"' -f2)" != "${GITHUB_REF#refs/tags/}" ]; then
             echo "Version tag does not match manifest"
             exit 1

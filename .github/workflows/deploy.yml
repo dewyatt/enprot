@@ -17,7 +17,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v1
-      - run: |
+      - name: Check version
+        run: |
           if [ "$(grep '^version' Cargo.toml | cut -d '"' -f2)" != "${GITHUB_REF#refs/tags/}" ]; then
             echo "Version tag does not match manifest"
             exit 1

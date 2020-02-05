@@ -184,6 +184,7 @@ jobs:
           set -euxo pipefail
           ci/install.sh
           RELEASE_TAG=${GITHUB_REF#refs/tags/}
+          cargo --version
           cargo publish --dry-run
           du -hs target
           cargo package --list

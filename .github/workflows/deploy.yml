@@ -186,6 +186,5 @@ jobs:
           RELEASE_TAG=${GITHUB_REF#refs/tags/}
           cargo publish --dry-run
           du -hs target
-          find target -type f
           cargo package --list
 
